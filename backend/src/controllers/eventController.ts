@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { CreateEventInput, SocialEvent } from "../models/eventModel";
+import { supabase } from "../config/supabase";
 
 const eventsDb: SocialEvent[] = [
   {
@@ -15,7 +16,12 @@ const eventsDb: SocialEvent[] = [
 
 export const getEvents = async (req: Request, res: Response) => {
   try {
-    return res.status(200).json({ succes: true, data: eventsDb });
+    const { data, error } = await supabase.from("events").select("*");
+
+    if (error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+    return res.status(200).json({ success: true, data });
   } catch (error) {
     return res
       .status(500)
