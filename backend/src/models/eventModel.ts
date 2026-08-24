@@ -5,6 +5,7 @@ export interface SocialEvent {
     title: string;
     maxParticipants: number;
     currentParticipants: number;
+    currentParticipantsCount: number;
     targetGender: GenderFilter;
     minAge: number;
 }
