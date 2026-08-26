@@ -5,6 +5,7 @@ import {
   getEvents,
   updateEvent,
 } from "../controllers/eventController";
+import { register, login } from "../controllers/authController";
 
 const router = Router();
 
