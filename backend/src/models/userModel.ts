@@ -1,11 +1,12 @@
+export type UserRole = 'user' | 'volunteer_host' | 'venue_partner' | 'admin';
+
 export interface User {
     id: string;
     email: string;
-    password?: string;
     name: string;
     age: number;
     gender: string;
-    isVolunteerHost: boolean;
+    role: UserRole;
     attendedEventsCount: number;
     createdAd?: string;
 }
