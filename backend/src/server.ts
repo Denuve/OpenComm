@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 
 import eventRoutes from './routes/eventRoutes';
 import authRoutes from './routes/authRoutes';
+import adminRoutes from './routes/adminRoutes';
 
 dotenv.config();
 
@@ -15,6 +16,8 @@ app.use(express.json());
 
 // Authentication Routes
 app.use('/api/auth' , authRoutes);
+
+app.use('/api/admin/' , adminRoutes);
 
 //Api Routes
 app.use('/api/events', eventRoutes);
