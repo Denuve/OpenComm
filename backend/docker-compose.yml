@@ -5,6 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: development
     container_name: opencomm-api
     ports:
       - "5000:5000"
