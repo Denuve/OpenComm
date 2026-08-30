@@ -54,12 +54,10 @@ export const getEvents = async (req: AuthenticatedRequest, res: Response) => {
       data,
     });
   } catch (error: any) {
-    return res
-      .status(500)
-      .json({
-        success: false,
-        message: `Error fetching events:${error.message}`,
-      });
+    return res.status(500).json({
+      success: false,
+      message: `Error fetching events:${error.message}`,
+    });
   }
 };
 
@@ -309,6 +307,173 @@ export const deleteEvent = async (req: AuthenticatedRequest, res: Response) => {
     return res.status(200).json({
       success: true,
       message: "Evenimentul a fost șters cu succes!",
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const joinEvent = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized!",
+      });
+    }
+
+    const { id } = req.params;
+    const { userId } = req.user;
+
+    const { data: event, error: fetchError } = await supabase
+      .from("events")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (event.status !== "CONFIRMED" || event.status === "FINISHED") {
+      return res.status(400).json({
+        success: false,
+        message: "Event finished or not available",
+      });
+    }
+
+    if (event.current_participants_count >= event.max_participants) {
+      return res.status(400).json({
+        success: false,
+        message: "Event is full.",
+      });
+    }
+
+    const { data: existingParticipant } = await supabase
+      .from("event_participants")
+      .select("*")
+      .eq("event_id", id)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (existingParticipant) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Already joined this event." });
+    }
+
+    const { error: joinError } = await supabase
+      .from("event_participants")
+      .insert([{ event_id: id, user_id: userId, status: "CONFIRMED" }]);
+
+    if (joinError) {
+      return res.status(400).json({
+        success: false,
+        message: joinError.message,
+      });
+    }
+
+    const { data: updatedEvent, error: updateError } = await supabase
+      .from("events")
+      .update({
+        current_participants_count: event.current_participants_count + 1,
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (updateError) {
+      return res
+        .status(500)
+        .json({ success: false, message: updateError.message });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Joined the event successfully!",
+      data: updateEvent,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const leaveEvent = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        succes: false,
+        message: "Not authenticated!",
+      });
+    }
+
+    const { id } = req.params;
+    const { userId } = req.user;
+
+    const { data: event, error: fetchError } = await supabase
+      .from("events")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (fetchError || !event) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Event not found!" });
+    }
+
+    if (event.host_id === userId) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Organizatorul nu poate părăsi evenimentul! Folosește opțiunea de ștergere.",
+      });
+    }
+
+    const { data: participant } = await supabase
+      .from("event_participants")
+      .select("*")
+      .eq("event_id", id)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (!participant) {
+      return res.status(400).json({
+        success: false,
+        message: "Nu ești înscris la acest eveniment!",
+      });
+    }
+
+    const { error: deleteError } = await supabase
+      .from("event_participants")
+      .delete()
+      .eq("event_id", id)
+      .eq("user_id", userId);
+
+    if (deleteError) {
+      return res
+        .status(400)
+        .json({ success: false, message: deleteError.message });
+    }
+
+    const { data: updatedEvent, error: updateError } = await supabase
+      .from("events")
+      .update({
+        current_participants_count: Math.max(
+          1,
+          event.current_participants_count - 1,
+        ),
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (updateError) {
+      return res
+        .status(500)
+        .json({ success: false, message: updateError.message });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Ai părăsit evenimentul!",
+      data: updatedEvent,
     });
   } catch (error: any) {
     return res.status(500).json({ success: false, message: error.message });
