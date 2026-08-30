@@ -3,6 +3,8 @@ import {
   createEvent,
   deleteEvent,
   getEvents,
+  joinEvent,
+  leaveEvent,
   updateEvent,
 } from "../controllers/eventController";
 import { authenticate } from "../middlewares/authMiddleware";
@@ -16,4 +18,8 @@ router.get("/", getEvents);
 router.post("/", authenticate, createEvent);
 router.put("/:id", authenticate, updateEvent);
 router.delete("/:id", authenticate, deleteEvent);
+
+router.post("/:id/join", authenticate, joinEvent);
+router.post("/:id/leave", authenticate, leaveEvent);
+
 export default router;
