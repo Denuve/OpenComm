@@ -5,13 +5,15 @@ import {
   getEvents,
   updateEvent,
 } from "../controllers/eventController";
-import { register, login } from "../controllers/authController";
+import { authenticate } from "../middlewares/authMiddleware";
 
 const router = Router();
 
-// Endpoint: GET /api/events
+// Public
 router.get("/", getEvents);
-router.post("/", createEvent);
-router.put("/:id", updateEvent);
-router.delete("/:id", deleteEvent);
+
+// Authenticated
+router.post("/", authenticate, createEvent);
+router.put("/:id", authenticate, updateEvent);
+router.delete("/:id", authenticate, deleteEvent);
 export default router;

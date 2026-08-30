@@ -1,142 +1,160 @@
-import { Request, Response } from "express";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import { supabase } from "../config/supabase";
-import { RegisterInput, LoginInput, User } from "../models/userModel";
+import { Request, Response } from 'express';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { supabase } from '../config/supabase';
+import { User } from '../models/userModel';
 
-const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret";
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
 export const register = async (req: Request, res: Response) => {
-    try {
-        const { email, password, name, age, gender }: RegisterInput = req.body;
+  try {
+    // Preluăm câmpurile flexibil (acceptăm name/fullName și age/birthDate)
+    const email = req.body.email;
+    const password = req.body.password;
+    const name = req.body.name || req.body.fullName || req.body.full_name;
+    const age = req.body.age;
+    const gender = req.body.gender;
 
-        if (!email || !password || !name || !age || !gender) {
-            return res.status(400).json({
-                success: false,
-                message: "All fields are mandatory!"
-            });
-        }
-
-        const { data: existingUser } = await supabase
-            .from('users')
-            .select('id')
-            .eq('email', email)
-            .single();
-
-        if (existingUser) {
-            return res.status(400).json({
-                success: false,
-                message: "This email is already in use"
-            });
-        }
-
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        const { data, error } = await supabase
-            .from('users')
-            .insert([
-                {
-                    email,
-                    password: hashedPassword,
-                    name,
-                    age,
-                    gender,
-                    role: 'user'
-                }
-            ])
-            .select('id, email, name, age, gender, role, attended_events_count')
-            .single();
-
-        if (error || !data) {
-            return res.status(400).json({
-                success: false,
-                message: error?.message || 'Eroare la crearea contului'
-            });
-        }
-
-        const newUser: User = {
-            id: data.id,
-            email: data.email,
-            name: data.name,
-            age: data.age,
-            gender: data.gender,
-            role: data.role,
-            attendedEventsCount: data.attended_events_count
-        };
-
-        const token = jwt.sign({ userId: newUser.id, email: newUser.email, role: newUser.role }, JWT_SECRET, {
-            expiresIn: '7d'
-        });
-
-        return res.status(200).json({
-            success: true,
-            message: "User registered succesfull!",
-            data: { user: newUser, token }
-        });
-    } catch (error) {
-        return res.status(500).json({
-            success: false,
-            message: "Error registering user!"
-        });
+    if (!email || !password || !name || !gender) {
+      return res.status(400).json({
+        success: false,
+        message: 'Toate câmpurile (email, password, name/fullName, gender) sunt obligatorii!'
+      });
     }
-}
+
+    // 1. Verificăm dacă e-mailul există deja (folosind maybeSingle)
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'Acest e-mail este deja utilizat!'
+      });
+    }
+
+    // 2. Hașurăm parola
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // 3. Inserăm în Supabase (Mapăm câmpurile pe structura reală a tabelei)
+    const { data, error } = await supabase
+      .from('users')
+      .insert([
+        {
+          email: email.toLowerCase().trim(),
+          password_hash: hashedPassword, // Sau 'password' în funcție de coloana din Supabase
+          full_name: name,
+          gender: gender,
+          role: 'user',
+          attended_events_count: 0
+        }
+      ])
+      .select('id, email, full_name, gender, role, attended_events_count')
+      .single();
+
+    if (error || !data) {
+      return res.status(400).json({
+        success: false,
+        message: error?.message || 'Eroare la crearea contului în Supabase!'
+      });
+    }
+
+    // 4. Construim obiectul User
+    const newUser: User = {
+      id: data.id,
+      email: data.email,
+      name: data.full_name,
+      age: age || 20,
+      gender: data.gender,
+      role: data.role,
+      attendedEventsCount: data.attended_events_count
+    };
+
+    // 5. Generăm token-ul JWT (include rolul pentru middleware-urile de securitate)
+    const token = jwt.sign(
+      { userId: newUser.id, email: newUser.email, role: newUser.role },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: 'Utilizator înregistrat cu succes!',
+      data: { user: newUser, token }
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Eroare de server la înregistrare!'
+    });
+  }
+};
 
 export const login = async (req: Request, res: Response) => {
-    try {
-        const { email, password }: LoginInput = req.body;
+  try {
+    const { email, password } = req.body;
 
-        if (!email || !password) {
-            return res.status(400).json({
-                success: false,
-                message: "Email and password required"
-            });
-        };
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'E-mailul și parola sunt obligatorii!'
+      });
+    }
 
-        const { data: user, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('email', email)
-            .single();
+    // Căutăm utilizatorul în Supabase
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email.toLowerCase().trim())
+      .maybeSingle();
 
-        if (error || !user) {
-            return res.status(401).json({
-                success: false,
-                message: "Incorrect email or password"
-            });
-        }
+    if (error || !user) {
+      return res.status(401).json({
+        success: false,
+        message: 'E-mail sau parolă incorectă!'
+      });
+    }
 
-        const isPasswordValid = await bcrypt.compare(password, user.password);
+    // Verificăm parola (suportă atât coloana password_hash cât și password)
+    const storedHash = user.password_hash || user.password;
+    const isPasswordValid = await bcrypt.compare(password, storedHash);
 
-        if (!isPasswordValid) {
-            return res.status(401).json({
-                success: false,
-                message: "Incorrect email or password"
-            });
-        }
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'E-mail sau parolă incorectă!'
+      });
+    }
 
-        const token = jwt.sign({ userId: user.id, email: user.email, role: user.role }, JWT_SECRET, {
-            expiresIn: '7d'
-        });
+    // Generăm Token-ul JWT
+    const token = jwt.sign(
+      { userId: user.id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
 
-        const userProfile: User = {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            age: user.age,
-            gender: user.gender,
-            role: user.role,
-            attendedEventsCount: user.attended_events_count
-        };
-
-        return res.status(200).json({
-            success: true,
-            message: "Authentication successfull!",
-            data: { userProfile, token }
-        });
-    } catch (error) {
-        return res.status(500).json({
-            success: true,
-            message: "Server error: Failed authentication!",
-        })
+    const userProfile: User = {
+      id: user.id,
+      email: user.email,
+      name: user.full_name || user.name,
+      age: user.age || 20,
+      gender: user.gender,
+      role: user.role,
+      attendedEventsCount: user.attended_events_count || 0
     };
-}
+
+    return res.status(200).json({
+      success: true,
+      message: 'Autentificare reușită!',
+      data: { userProfile, token }
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false, // Corectat din true în false
+      message: error.message || 'Eroare de server la autentificare!'
+    });
+  }
+};
