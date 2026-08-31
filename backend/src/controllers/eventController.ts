@@ -479,3 +479,122 @@ export const leaveEvent = async (req: AuthenticatedRequest, res: Response) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// Haversine
+function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371e3;
+  const rad = Math.PI / 180;
+  const dLat = (lat2 - lat1) * rad;
+  const dLon = (lon2 - lon1) * rad;
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+
+export const checkInEvent = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "Neautentificat!" });
+    }
+
+    const { id } = req.params;
+    const { userId } = req.user;
+    const { latitude, longitude } = req.body;
+
+    if (latitude === undefined || longitude === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: "Coordonatele GPS (latitude, longitude) sunt obligatorii!",
+      });
+    }
+
+    // 1. Verificăm înscrierea utilizatorului
+    const { data: participant, error: partError } = await supabase
+      .from("event_participants")
+      .select("*")
+      .eq("event_id", id)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (partError || !participant) {
+      return res.status(400).json({
+        success: false,
+        message: "Nu ești înscris la acest eveniment!",
+      });
+    }
+
+    if (participant.status === "CHECKED_IN") {
+      return res.status(400).json({
+        success: false,
+        message: "Ai făcut deja Check-in-ul la acest eveniment!",
+      });
+    }
+
+    // 2. Preluăm coordonatele evenimentului (sau ale locației partenere)
+    const { data: event, error: eventError } = await supabase
+      .from("events")
+      .select("*, venues(latitude, longitude)")
+      .eq("id", id)
+      .single();
+
+    if (eventError || !event) {
+      return res.status(404).json({ success: false, message: "Evenimentul nu a fost găsit!" });
+    }
+
+    const targetLat = event.venues?.latitude ?? 46.7712;
+    const targetLon = event.venues?.longitude ?? 23.6236;
+
+    // 3. Validăm distanța (maxim 200m)
+    const distance = calculateDistanceMeters(
+      parseFloat(latitude),
+      parseFloat(longitude),
+      targetLat,
+      targetLon
+    );
+
+    const MAX_RADIUS_METERS = 200;
+    if (distance > MAX_RADIUS_METERS) {
+      return res.status(400).json({
+        success: false,
+        message: `Ești prea departe de locație! Distanța actuală: ${Math.round(distance)}m (Maxim permis: ${MAX_RADIUS_METERS}m).`,
+      });
+    }
+
+    // 4. Actualizăm starea participantului
+    const { error: updatePartError } = await supabase
+      .from("event_participants")
+      .update({ status: "CHECKED_IN" })
+      .eq("event_id", id)
+      .eq("user_id", userId);
+
+    if (updatePartError) {
+      return res.status(500).json({ success: false, message: updatePartError.message });
+    }
+
+    // 5. Incrementăm contorul de participări ale utilizatorului
+    const { data: dbUser } = await supabase
+      .from("users")
+      .select("attended_events_count")
+      .eq("id", userId)
+      .single();
+
+    const currentAttended = dbUser?.attended_events_count || 0;
+
+    await supabase
+      .from("users")
+      .update({ attended_events_count: currentAttended + 1 })
+      .eq("id", userId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Check-in realizat cu succes! Prezență confirmată.",
+      distanceMeters: Math.round(distance),
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};

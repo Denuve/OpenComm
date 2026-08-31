@@ -5,6 +5,8 @@ import dotenv from 'dotenv';
 import eventRoutes from './routes/eventRoutes';
 import authRoutes from './routes/authRoutes';
 
+import { authenticate, checkRole } from './middlewares/authMiddleware';
+
 dotenv.config();
 
 const app = express();
@@ -14,10 +16,14 @@ app.use(cors());
 app.use(express.json());
 
 // Authentication Routes
-app.use('/api/auth' , authRoutes);
+app.use('/api/auth', authRoutes);
 
 //Api Routes
 app.use('/api/events', eventRoutes);
+
+app.get('api/admin/dashboard', authenticate, checkRole(['admin']), (req, res) => {
+    res.json({ success: true, message: 'Welcome in admin dashboard!' });
+});
 
 
 app.get('/health', (req: Request, res: Response) => {

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  checkInEvent,
   createEvent,
   deleteEvent,
   getEvents,
@@ -21,5 +22,6 @@ router.delete("/:id", authenticate, deleteEvent);
 
 router.post("/:id/join", authenticate, joinEvent);
 router.post("/:id/leave", authenticate, leaveEvent);
+router.post("/:id/checkin", authenticate, checkInEvent);
 
 export default router;
