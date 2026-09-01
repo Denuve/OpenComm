@@ -5,14 +5,22 @@ import { fetchEvents } from '../services/api';
 
 export const FeedScreen = () => {
     const [events, setEvents] = useState<SocialEvent[]>([]);
-    const [loading, setLoading] = useState<boolean>(true);
-    const [refreshing, setRefreshing] = useState<boolean>(true);
+    const [loading, setLoading] = useState<boolean>(false);
+    const [refreshing, setRefreshing] = useState<boolean>(false);
 
     const loadEvents = async () => {
-        setLoading(true);
-        const data = await fetchEvents(22);
-        setEvents(data);
-        setLoading(false);
+        try {
+            console.log('🔄 Începe încărcarea evenimentelor...');
+            const data = await fetchEvents();
+            console.log('✅ Date primite:', data);
+            setEvents(data);
+        } catch (error) {
+            console.error('❌ Eroare în FeedScreen:', error);
+        } finally {
+            console.log('⏹️ Oprește starea de loading.');
+            setLoading(false);
+        }
+
     };
 
     useEffect(() => {
@@ -21,7 +29,7 @@ export const FeedScreen = () => {
 
     const onRefresh = async () => {
         setRefreshing(true);
-        const data = await fetchEvents(22);
+        const data = await fetchEvents();
         setEvents(data);
         setRefreshing(false);
     };
@@ -49,9 +57,9 @@ export const FeedScreen = () => {
         );
     }
 
-    return(
+    return (
         <View style={styles.container}>
-            <FlatList 
+            <FlatList
                 data={events}
                 keyExtractor={(item) => item.id}
                 renderItem={renderEventCard}
