@@ -5,7 +5,7 @@ import { fetchEvents } from '../services/api';
 
 export const FeedScreen = () => {
     const [events, setEvents] = useState<SocialEvent[]>([]);
-    const [loading, setLoading] = useState<bolean>(true);
+    const [loading, setLoading] = useState<boolean>(true);
     const [refreshing, setRefreshing] = useState<boolean>(true);
 
     const loadEvents = async () => {
