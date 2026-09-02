@@ -11,11 +11,11 @@ export const register = async (req: Request, res: Response) => {
     // Preluăm câmpurile flexibil (acceptăm name/fullName și age/birthDate)
     const email = req.body.email;
     const password = req.body.password;
-    const name = req.body.name || req.body.fullName || req.body.full_name;
+    const name = req.body.name;
     const age = req.body.age;
     const gender = req.body.gender;
 
-    if (!email || !password || !name || !gender) {
+    if (!email || !password || !name || !gender || !age) {
       return res.status(400).json({
         success: false,
         message: 'Toate câmpurile (email, password, name/fullName, gender) sunt obligatorii!'
@@ -45,14 +45,15 @@ export const register = async (req: Request, res: Response) => {
       .insert([
         {
           email: email.toLowerCase().trim(),
-          password_hash: hashedPassword, // Sau 'password' în funcție de coloana din Supabase
-          full_name: name,
+          password: hashedPassword, // Sau 'password' în funcție de coloana din Supabase
+          name: name,
           gender: gender,
+          age: age,
           role: 'user',
           attended_events_count: 0
         }
       ])
-      .select('id, email, full_name, gender, role, attended_events_count')
+      .select('id, email, name, gender, role, attended_events_count, age')
       .single();
 
     if (error || !data) {
@@ -66,7 +67,7 @@ export const register = async (req: Request, res: Response) => {
     const newUser: User = {
       id: data.id,
       email: data.email,
-      name: data.full_name,
+      name: data.name,
       age: age || 20,
       gender: data.gender,
       role: data.role,
@@ -139,7 +140,7 @@ export const login = async (req: Request, res: Response) => {
     const userProfile: User = {
       id: user.id,
       email: user.email,
-      name: user.full_name || user.name,
+      name: user.name,
       age: user.age || 20,
       gender: user.gender,
       role: user.role,
