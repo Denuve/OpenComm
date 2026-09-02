@@ -1,44 +1,30 @@
 #!/bin/bash
 
 API_URL="http://localhost:5000/api"
-TIMESTAMP=$(date +%s)
-EMAIL="admin_${TIMESTAMP}@test.com"
-PASSWORD="ParolaSecreta123!"
+ADMIN_EMAIL="admin@test.com"
+ADMIN_PASSWORD="ParolaSecreta123!" # Parola setată la înregistrarea contului
 
-echo "🚀 1. Înregistrare Admin ($EMAIL)..."
+echo "🔑 1. Autentificare Admin ($ADMIN_EMAIL)..."
 
-REGISTER_RES=$(curl -s -X POST "$API_URL/auth/register" \
+LOGIN_RES=$(curl -s -X POST "$API_URL/auth/login" \
   -H "Content-Type: application/json" \
   -d "{
-    \"email\": \"$EMAIL\",
-    \"password\": \"$PASSWORD\",
-    \"name\": \"Admin Test\",
-    \"age\": 28,
-    \"gender\": \"male\",
-    \"role\": \"admin\"
+    \"email\": \"$ADMIN_EMAIL\",
+    \"password\": \"$ADMIN_PASSWORD\"
   }")
 
-TOKEN=$(node -e "try { const r=JSON.parse(process.argv[1]); console.log(r.data?.token || r.token || r.accessToken || ''); } catch(e){}" "$REGISTER_RES")
-HOST_ID=$(node -e "try { const r=JSON.parse(process.argv[1]); console.log(r.data?.user?.id || r.user?.id || r.data?.id || ''); } catch(e){}" "$REGISTER_RES")
+TOKEN=$(node -e "try { const r=JSON.parse(process.argv[1]); console.log(r.data?.token || r.token || r.accessToken || ''); } catch(e){}" "$LOGIN_RES")
+HOST_ID=$(node -e "try { const r=JSON.parse(process.argv[1]); console.log(r.data?.user?.id || r.user?.id || r.data?.id || ''); } catch(e){}" "$LOGIN_RES")
 
 if [ -z "$TOKEN" ]; then
-  echo "🔑 2. Încercare Autentificare (Login)..."
-  LOGIN_RES=$(curl -s -X POST "$API_URL/auth/login" \
-    -H "Content-Type: application/json" \
-    -d "{ \"email\": \"$EMAIL\", \"password\": \"$PASSWORD\" }")
-  
-  TOKEN=$(node -e "try { const r=JSON.parse(process.argv[1]); console.log(r.data?.token || r.token || r.accessToken || ''); } catch(e){}" "$LOGIN_RES")
-  HOST_ID=$(node -e "try { const r=JSON.parse(process.argv[1]); console.log(r.data?.user?.id || r.user?.id || r.data?.id || ''); } catch(e){}" "$LOGIN_RES")
-fi
-
-if [ -z "$TOKEN" ]; then
-  echo "❌ Eroare: Nu s-a obținut token-ul de acces."
+  echo "❌ Eroare la autentificare! Verifică dacă e-mailul $ADMIN_EMAIL există în DB și parola este corectă."
+  echo "Răspuns server: $LOGIN_RES"
   exit 1
 fi
 
-echo "✅ Auth OK | Host ID: $HOST_ID"
+echo "✅ Autentificat cu succes! Host ID: $HOST_ID"
 echo "--------------------------------------------------"
-echo "🚀 3. Creare eveniment nou..."
+echo "🚀 2. Creare eveniment nou..."
 
 EVENT_RES=$(curl -s -X POST "$API_URL/events" \
   -H "Content-Type: application/json" \
@@ -51,7 +37,7 @@ EVENT_RES=$(curl -s -X POST "$API_URL/events" \
     \"description\": \"Jocuri de societate în grup mic.\",
     \"maxParticipants\": 6,
     \"max_participants\": 6,
-    \"currentParticipantsCount\": 3,
+    \"currentParticipantsCount\": 1,
     \"targetGender\": \"mixed\",
     \"target_gender\": \"mixed\",
     \"minAge\": 18,
