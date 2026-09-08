@@ -1,6 +1,5 @@
 import { SocialEvent } from "../types/event";
-
-const API_URL = 'http://192.168.1.83:5000/api';
+import { API_URL } from "../config/api";
 
 export const fetchEvents = async (userAge?: number, search?: string): Promise<SocialEvent[]> => {
     const controller = new AbortController();
@@ -23,7 +22,7 @@ export const fetchEvents = async (userAge?: number, search?: string): Promise<So
 
             console.error('⏱️ Serverul nu a răspuns în 5 secunde (Timeout)');
         } else {
-            console.error('❌ Eroare de rețea / API:', error);
+            console.error('❌ Eroare de rețea / API:', error.message);
         }
         return [];
     }
