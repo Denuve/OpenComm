@@ -12,9 +12,11 @@ export interface SocialEvent {
     max_age?: number;
     event_type: EventType;
     status: string;
+    description: string;
     users?: {
         id: string;
         email: string;
         role: string;
     };
+    distance: number;
 }
